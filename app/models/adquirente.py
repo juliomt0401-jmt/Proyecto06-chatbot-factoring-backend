@@ -1,7 +1,7 @@
 from typing import Dict, Any
 from decimal import Decimal
 from app.bd import BD
-from app.logica import calcular_TEM_desde_TEA, _consultar_ruc_api
+from app.logica import calcular_TEM_desde_TEA, consultar_ruc_api
 
 
 def _calcular_tea_adquirente_por_ranking_top(RUC: str) -> Decimal:
@@ -81,7 +81,7 @@ class Adquirente:
         if recordset:
             return recordset[0]
 
-        razon_social = _consultar_ruc_api(RUC)
+        razon_social = consultar_ruc_api(RUC)
         TEA = _calcular_tea_adquirente_por_ranking_top(RUC)
         TEM = calcular_TEM_desde_TEA(TEA)
 

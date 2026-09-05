@@ -1,5 +1,5 @@
 from app.bd import BD
-from app.logica import buscar_descripcion_tabla, _consultar_ruc_api
+from app.logica import buscar_descripcion_tabla, consultar_ruc_api
 
 
 class Proveedor:
@@ -39,7 +39,7 @@ class Proveedor:
         if recordset:
             return recordset[0]
 
-        razon_social = _consultar_ruc_api(RUC)
+        razon_social = consultar_ruc_api(RUC)
 
         return {
             "idProveedor": 0,

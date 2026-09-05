@@ -17,7 +17,8 @@ def calcular_TED_desde_TEM(TEM: Decimal) -> Decimal:
     TED = (Decimal("1") + TEM) ** (Decimal("1") / Decimal("30")) - Decimal("1")
     return TED.quantize(Decimal("0.000001"), rounding=ROUND_HALF_UP)
 
-def _consultar_ruc_api(RUC: str) -> str:
+
+def consultar_ruc_api(RUC: str) -> str:
     try:
         url = f"https://openruc.com/api/ruc/{RUC}"
         response = requests.get(url, timeout=5)
@@ -46,7 +47,7 @@ def buscar_descripcion_tabla(tabla: str, elemento: str) -> str | None:
     sql = """
         SELECT Descripcion
         FROM sys_tablas
-        WHERE  idTabla=%s and iElemento=%s
+        WHERE  idTabla=%s and idElemento=%s
     """
     db = BD()
     recordset = db.ejecutar_SQL(sql, (tabla, elemento))
