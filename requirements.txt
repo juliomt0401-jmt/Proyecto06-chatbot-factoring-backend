@@ -2,3 +2,4 @@ google-genai
 mysql-connector-python
 python-dotenv
 pytest
+reportlab
