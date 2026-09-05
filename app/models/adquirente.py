@@ -1,23 +1,20 @@
 from typing import Dict, Any
 from decimal import Decimal
-import requests
 from app.bd import BD
-from app.logica import calcular_TEM_desde_TEA
+from app.logica import calcular_TEM_desde_TEA, _consultar_ruc_api
 
 
 def _calcular_tea_adquirente_por_ranking_top(RUC: str) -> Decimal:
-
-    db = BD()
 
     sql = """
         SELECT Ranking
         FROM Top10K
         WHERE RUC = %s
     """
+    db = BD()
     recordset = db.ejecutar_SQL(sql, (RUC,))
     if not recordset:
         return Decimal("0.3000")
-
     ranking = recordset[0]["Ranking"]
 
     # Top 1 al 1000
@@ -36,29 +33,6 @@ def _calcular_tea_adquirente_por_ranking_top(RUC: str) -> Decimal:
     # Fuera de política
     return Decimal("0.3000")
 
-def _consultar_ruc_api(RUC: str) -> str:
-    try:
-        url = f"https://openruc.com/api/ruc/{RUC}"
-        response = requests.get(url, timeout=5)
-        response.raise_for_status()
-        datos = response.json()
-        return datos.get("razon_social", "")
-
-    except requests.Timeout:
-        print("Error: tiempo de espera agotado al consultar OpenRUC.")
-        return ""
-    except requests.ConnectionError:
-        print("Error: no se pudo conectar con OpenRUC.")
-        return ""
-    except requests.HTTPError as e:
-        print(f"Error HTTP al consultar OpenRUC: {e}")
-        return ""
-    except requests.RequestException as e:
-        print(f"Error en la consulta a OpenRUC: {e}")
-        return ""
-    except ValueError:
-        print("Error: OpenRUC devolvió una respuesta que no es JSON válido.")
-        return ""
 
 class Adquirente:
 
