@@ -78,6 +78,8 @@ def consultar_ruc_api(RUC: str) -> str:
     try:
         url = f"https://openruc.com/api/ruc/{RUC}"
         response = requests.get(url, timeout=5)
+        if response.status_code == 404:             #404 Not Found
+            return ""
         response.raise_for_status()
         datos = response.json()
         return datos.get("razon_social", "")
