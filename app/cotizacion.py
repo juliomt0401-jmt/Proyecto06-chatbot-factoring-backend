@@ -5,7 +5,7 @@ from pathlib import Path
 from reportlab.lib import colors
 from reportlab.lib.colors import HexColor
 from reportlab.lib.enums import TA_RIGHT
-from reportlab.lib.pagesizes import A4
+from reportlab.lib.pagesizes import A4, landscape
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import cm
 from reportlab.platypus import (
@@ -55,6 +55,7 @@ def generar_cotizacion_pdf(
     #        "Plazo": int,
     #        "ImporteAdelanto": Decimal,
     #        "Interes": Decimal,
+    #        "ComisionFactoring": Decimal,
     #        "IGV": Decimal,
     #        "ImporteDesembolsar": Decimal,
     #        "ImporteRemanente": Decimal
@@ -99,7 +100,7 @@ def generar_cotizacion_pdf(
     # Página
     # ---------------------------------------------------------
 
-    ancho_pagina, alto_pagina = A4
+    ancho_pagina, alto_pagina = landscape(A4)
 
     # Dejamos poco espacio lateral para aprovechar la tabla.
     margen_izquierdo = 0.70 * cm
@@ -107,7 +108,7 @@ def generar_cotizacion_pdf(
 
     documento = SimpleDocTemplate(
         str(ruta_salida),
-        pagesize=A4,
+        pagesize=landscape(A4),
         leftMargin=margen_izquierdo,
         rightMargin=margen_derecho,
         topMargin=1.10 * cm,
@@ -255,6 +256,11 @@ def generar_cotizacion_pdf(
 
     interes_total = sum(
         Decimal(f["Interes"])
+        for f in facturas
+    )
+
+    comision_factoring_total = sum(
+        Decimal(f["ComisionFactoring"])
         for f in facturas
     )
 
@@ -603,6 +609,7 @@ def generar_cotizacion_pdf(
         "Factor",
         "Adelanto",
         "Interés",
+        "Comisión Factoring",
         "IGV",
         "Desembolso",
         "Remanente",
@@ -681,6 +688,12 @@ def generar_cotizacion_pdf(
             ),
             Paragraph(
                 formato_moneda(
+                    factura["ComisionFactoring"]
+                ),
+                estilo_detalle
+            ),
+            Paragraph(
+                formato_moneda(
                     factura["IGV"]
                 ),
                 estilo_detalle
@@ -708,17 +721,18 @@ def generar_cotizacion_pdf(
 
     proporciones = [
         0.025,   # #
-        0.190,   # adquirente
-        0.090,   # importe
-        0.080,   # fecha
-        0.045,   # plazo
-        0.055,   # TEM
+        0.205,   # adquirente
+        0.080,   # importe
+        0.070,   # fecha
+        0.040,   # plazo
+        0.050,   # TEM
         0.050,   # factor
-        0.095,   # adelanto
-        0.080,   # interés
-        0.065,   # IGV
-        0.120,   # desembolso
-        0.105,   # remanente
+        0.085,   # adelanto
+        0.070,   # interés
+        0.085,   # comisión factoring
+        0.060,   # IGV
+        0.095,   # desembolso
+        0.085,   # remanente
     ]
 
     anchos_detalle = [
@@ -835,6 +849,10 @@ def generar_cotizacion_pdf(
                     estilo_label
                 ),
                 Paragraph(
+                    "Comisión Factoring total",
+                    estilo_label
+                ),
+                Paragraph(
                     "IGV total",
                     estilo_label
                 ),
@@ -849,6 +867,10 @@ def generar_cotizacion_pdf(
                     estilo_valor
                 ),
                 Paragraph(
+                    formato_moneda(comision_factoring_total),
+                    estilo_valor
+                ),
+                Paragraph(
                     formato_moneda(igv_total),
                     estilo_valor
                 ),
@@ -859,9 +881,10 @@ def generar_cotizacion_pdf(
             ],
         ],
         colWidths=[
-            ancho_util / 3,
-            ancho_util / 3,
-            ancho_util / 3,
+            ancho_util / 4,
+            ancho_util / 4,
+            ancho_util / 4,
+            ancho_util / 4,
         ],
     )
 

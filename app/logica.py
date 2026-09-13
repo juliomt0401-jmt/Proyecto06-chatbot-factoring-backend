@@ -33,6 +33,18 @@ def obtener_factor_vigente_IGV() -> Decimal:
     return igv_vigente
 
 
+def obtener_ingreso_minimo() -> Decimal:
+    sql = """
+        SELECT Valor1 FROM sys_parametros WHERE RUC_Factor = %s AND idParametro = '0038' AND Estado = 'V'
+    """
+    db = BD()
+    recordset = db.ejecutar_SQL(sql, (RUC_FACTOR,))
+    if not recordset:
+        return Decimal("0.00")  # Valor por defecto si no se encuentra en la base de datos
+    ingreso_minimo = Decimal(recordset[0]["Valor1"])
+    return ingreso_minimo
+
+
 def calcular_factoring(tea: Decimal, factor_adelanto: Decimal, importe: Decimal, fecha_pago: date) -> dict:
 
     # Plazo de financiamiento
@@ -50,11 +62,17 @@ def calcular_factoring(tea: Decimal, factor_adelanto: Decimal, importe: Decimal,
     uno = Decimal("1")
     interes = round( round( (uno - (uno / ((uno + ted) ** plazo))) * importe_adelanto, 3), 2)
 
+    # Comisión de factoring
+    comision_factoring = 0
+    ingreso_minimo = obtener_ingreso_minimo()
+    if interes < ingreso_minimo:
+        comision_factoring = ingreso_minimo - interes
+
     # IGV
-    igv = round( round(interes * obtener_factor_vigente_IGV(), 3), 2)
+    igv = round( round((interes+comision_factoring) * obtener_factor_vigente_IGV(), 3), 2)
 
     # Importe a desembolsar
-    importe_desembolsar = (importe_adelanto - interes - igv)
+    importe_desembolsar = (importe_adelanto - interes - comision_factoring - igv)
 
     # Importe remanente
     importe_remanente = (importe - importe_adelanto)
@@ -68,6 +86,7 @@ def calcular_factoring(tea: Decimal, factor_adelanto: Decimal, importe: Decimal,
         "ImporteAdelanto": importe_adelanto,
         "Plazo": plazo,
         "Interes": interes,
+        "ComisionFactoring": comision_factoring,
         "IGV": igv,
         "ImporteDesembolsar": importe_desembolsar,
         "ImporteRemanente": importe_remanente

@@ -4,16 +4,32 @@ from datetime import date, datetime
 from decimal import Decimal
 from pathlib import Path
 from fastapi.responses import FileResponse
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi import HTTPException
 
 from app.models.adquirente import Adquirente
 from app.models.proveedor import Proveedor
 from app.logica import calcular_factoring
 from app.cotizacion import generar_cotizacion_pdf
+from app.gemini_cliente import enviar_mensaje, consumir_pdf_generado
 
 app = FastAPI(
     title="API Factoring",
     version="1.0.0"
 )
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
+class ChatRequest(BaseModel):
+    session_id: str
+    message: str
 
 class CalculoFactoringRequest(BaseModel):
     tea: Decimal
@@ -26,6 +42,23 @@ class CotizacionPDFRequest(BaseModel):
     razon_social_proveedor: str
     id_proveedor: int
     facturas: list[dict]
+
+@app.get("/cotizaciones/{nombre_archivo}")
+def descargar_cotizacion(nombre_archivo: str):
+    BASE_DIR = Path(__file__).resolve().parent.parent
+    CARPETA_COTIZACIONES = BASE_DIR / "CotizacionesPDF"
+    ruta = CARPETA_COTIZACIONES / nombre_archivo
+    if not ruta.exists():
+        raise HTTPException(
+            status_code=404,
+            detail="Cotización no encontrada"
+        )
+
+    return FileResponse(
+        path=ruta,
+        media_type="application/pdf",
+        filename=nombre_archivo
+    )
 
 @app.get("/")
 def inicio():
@@ -68,3 +101,9 @@ def api_generar_cotizacion_pdf(datos: CotizacionPDFRequest) -> FileResponse:
         media_type="application/pdf",
         filename="cotizacion_factoring.pdf"
     )
+
+@app.post("/chat")
+def chat(request: ChatRequest) -> dict:
+    respuesta = enviar_mensaje(request.session_id, request.message)
+    archivo = consumir_pdf_generado(request.session_id)
+    return {"response": respuesta, "archivo": archivo}
