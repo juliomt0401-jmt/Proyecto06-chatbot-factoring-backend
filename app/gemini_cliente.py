@@ -2,7 +2,8 @@ import os
 import time
 from datetime import date, datetime
 from decimal import Decimal
-from typing import Any
+from typing import Any, Literal
+from pydantic import BaseModel, Field
 from pathlib import Path
 from dotenv import load_dotenv
 from contextvars import ContextVar
@@ -15,6 +16,20 @@ from app.models.adquirente import Adquirente
 from app.models.proveedor import Proveedor
 from app.logica import calcular_factoring as calcular_factoring_backend
 from app.cotizacion import generar_cotizacion_pdf as generar_cotizacion_pdf_backend
+
+
+class RespuestaAgente(BaseModel):
+    respuesta: str = Field(
+        description="Respuesta al usuario en español, con formato Markdown."
+    )
+    etapa: Literal[
+        "identificacion",
+        "facturas",
+        "evaluacion",
+        "cotizacion",
+    ] = Field(
+        description=("Etapa actual de la conversación, determinada según las reglas del SYSTEM_INSTRUCTION.")
+    )
 
 
 # Inicializar cliente
@@ -152,6 +167,8 @@ def crear_chat():
         model="gemini-3.6-flash",
         config=types.GenerateContentConfig(
             system_instruction=SYSTEM_INSTRUCTION,
+            response_mime_type="application/json",
+            response_schema=RespuestaAgente,
             tools=[
                 types.Tool(
                     file_search=types.FileSearch(
@@ -182,7 +199,7 @@ def consumir_pdf_generado(session_id: str) -> dict[str, str] | None:
     return pdf_generado.pop(session_id, None)
 
 
-def enviar_mensaje(session_id: str, mensaje: str) -> str:
+def enviar_mensaje(session_id: str, mensaje: str) -> dict:
 
     inicio = time.perf_counter()
     token = sesion_actual.set(session_id)
@@ -203,18 +220,22 @@ def enviar_mensaje(session_id: str, mensaje: str) -> str:
                     if part.text:
                         textos.append(part.text)
 
-        return "".join(textos)
+        resultado = RespuestaAgente.model_validate_json("".join(textos))
+        return {
+            "response": resultado.respuesta,
+            "etapa": resultado.etapa,
+        }
     except errors.ServerError as e:
         print(f">>> Error Gemini ServerError: {e}")
-        return (
-            "El servicio de atención está temporalmente ocupado. "
-            "Por favor, intenta nuevamente en unos segundos."
-        )
+        return {
+            "response": "El servicio de atención está temporalmente ocupado. Por favor, intenta nuevamente en unos segundos.",
+            "etapa": None,
+        }
     except Exception as e:
         print(f">>> Error inesperado: {e}")
-        return (
-            "Ocurrió un problema al procesar tu mensaje. "
-            "Por favor, intenta nuevamente."
-        )
+        return {
+            "response": "Ocurrió un problema al procesar tu mensaje. Por favor, intenta nuevamente.",
+            "etapa": None,
+        }
     finally:
         sesion_actual.reset(token)

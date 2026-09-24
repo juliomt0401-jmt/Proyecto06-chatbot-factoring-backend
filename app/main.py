@@ -104,6 +104,10 @@ def api_generar_cotizacion_pdf(datos: CotizacionPDFRequest) -> FileResponse:
 
 @app.post("/chat")
 def chat(request: ChatRequest) -> dict:
-    respuesta = enviar_mensaje(request.session_id, request.message)
+    resultado = enviar_mensaje(request.session_id, request.message)
     archivo = consumir_pdf_generado(request.session_id)
-    return {"response": respuesta, "archivo": archivo}
+    return {
+        "response": resultado["response"],
+        "etapa": resultado["etapa"],
+        "archivo": archivo,
+    }
