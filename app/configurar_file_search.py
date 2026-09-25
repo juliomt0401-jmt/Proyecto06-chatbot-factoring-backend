@@ -52,7 +52,7 @@ def modificar_storage():
 
     # 2. Subir la nueva base integrada
     operation = client.file_search_stores.upload_to_file_search_store(
-        file="rag/7. Base_conocimiento_Factoring_RAG_Integrada_v2.md",
+        file="rag/7. Base_conocimiento_Factoring_RAG_Integrada_v3.md",
         file_search_store_name=store_name,
         config={
             "display_name": "Base conocimiento Factoring"

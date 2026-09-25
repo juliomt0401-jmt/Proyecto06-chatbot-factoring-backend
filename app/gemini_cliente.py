@@ -68,16 +68,28 @@ def consultar_adquirente(RUC: str) -> dict[str, Any]:
     #Consulta un adquirente utilizando su RUC.
     #Input: RUC del adquirente.
     #Output: Diccionario con los datos del adquirente.
+    inicio = time.perf_counter()
     print(f">>> TOOL consultar_adquirente: {RUC}")
+
     resultado = Adquirente.consultar_adquirente(RUC)
+
+    fin = time.perf_counter()
+    print(f">>> Tiempo TOOL consultar_adquirente: {fin - inicio:.2f} s")
+
     return convertir_json(resultado)
 
 def consultar_proveedor(RUC: str) -> dict[str, Any]:
     #Consulta un proveedor utilizando su RUC.
     #Input: RUC del proveedor.
     #Output: Diccionario con los datos del proveedor
+    inicio = time.perf_counter()
     print(f">>> TOOL consultar_proveedor: {RUC}")
+
     resultado = Proveedor.consultar_proveedor(RUC)
+
+    fin = time.perf_counter()
+    print(f">>> Tiempo TOOL consultar_proveedor: {fin - inicio:.2f} s")
+
     return convertir_json(resultado)
 
 def calcular_factoring(tea: str, factor_adelanto: str, importe: str, fecha_pago: str) -> dict[str, Any]:
@@ -87,17 +99,23 @@ def calcular_factoring(tea: str, factor_adelanto: str, importe: str, fecha_pago:
     #           importe: VNPP de la factura.
     #           fecha_pago: Fecha de pago en formato YYYY-MM-DD.
     #Output: Diccionario con el cálculo del factoring
+    inicio = time.perf_counter()
     print(
         f">>> TOOL calcular_factoring: "
         f"TEA={tea}, Factor={factor_adelanto}, "
         f"Importe={importe}, Fecha={fecha_pago}"
     )
+
     resultado = calcular_factoring_backend(
         tea=Decimal(str(tea)),
         factor_adelanto=Decimal(str(factor_adelanto)),
         importe=Decimal(str(importe)),
         fecha_pago=date.fromisoformat(fecha_pago)
     )
+
+    fin = time.perf_counter()
+    print(f">>> Tiempo TOOL calcular_factoring: {fin - inicio:.2f} s")
+
     return convertir_json(resultado)
 
 def generar_cotizacion_pdf(ruc_proveedor: str, id_proveedor: int, facturas: list[dict]) -> dict[str, str]:
@@ -106,6 +124,7 @@ def generar_cotizacion_pdf(ruc_proveedor: str, id_proveedor: int, facturas: list
     #       id_proveedor: Identificador del proveedor.
     #       facturas: Lista de facturas ya calculadas.
     #Output: Ruta del archivo PDF generado.
+    inicio = time.perf_counter()
     print(f">>> TOOL generar_cotizacion_pdf: {ruc_proveedor}")
     print(f"ruc_proveedor={ruc_proveedor}")
     print(f"id_proveedor={id_proveedor}")
@@ -157,6 +176,9 @@ def generar_cotizacion_pdf(ruc_proveedor: str, id_proveedor: int, facturas: list
         "url": f"/cotizaciones/{nombre_archivo}"
     }
 
+    fin = time.perf_counter()
+    print(f">>> Tiempo TOOL generar_cotizacion_pdf: {fin - inicio:.2f} s")
+
     return {"nombre_archivo": nombre_archivo}
 
 
@@ -167,6 +189,7 @@ def crear_chat():
         model="gemini-3.6-flash",
         config=types.GenerateContentConfig(
             system_instruction=SYSTEM_INSTRUCTION,
+            thinking_config=types.ThinkingConfig(thinking_level=types.ThinkingLevel.LOW),
             response_mime_type="application/json",
             response_schema=RespuestaAgente,
             tools=[
@@ -201,26 +224,38 @@ def consumir_pdf_generado(session_id: str) -> dict[str, str] | None:
 
 def enviar_mensaje(session_id: str, mensaje: str) -> dict:
 
-    inicio = time.perf_counter()
+    inicio_total = time.perf_counter()
     token = sesion_actual.set(session_id)
     try:
+        inicio_chat = time.perf_counter()
         chat = obtener_chat(session_id)
+        fin_chat = time.perf_counter()
+
+        inicio_gemini = time.perf_counter()
         response = chat.send_message(mensaje)
-        fin = time.perf_counter()
-        print(f">>> Sesión: {session_id}")
-        print(f">>> Tiempo Gemini: {fin - inicio:.2f} segundos")
+        fin_gemini = time.perf_counter()
+
 
         #Limpiando la respuesta para evitar que salga warnings en la terminal
+        inicio_procesamiento = time.perf_counter()
         textos: list[str] = []
         if response.candidates:
             content = response.candidates[0].content
-
             if content and content.parts:
                 for part in content.parts:
                     if part.text:
                         textos.append(part.text)
 
         resultado = RespuestaAgente.model_validate_json("".join(textos))
+        fin_procesamiento = time.perf_counter()
+        fin_total = time.perf_counter()
+
+        print(f">>> Sesión: {session_id}")
+        print(f">>> Tiempo obtener_chat: {fin_chat - inicio_chat:.2f} s")
+        print(f">>> Tiempo send_message: {fin_gemini - inicio_gemini:.2f} s")
+        print(f">>> Tiempo procesamiento respuesta: {fin_procesamiento - inicio_procesamiento:.2f} s")
+        print(f">>> Tiempo TOTAL enviar_mensaje: {fin_total - inicio_total:.2f} s")
+
         return {
             "response": resultado.respuesta,
             "etapa": resultado.etapa,
