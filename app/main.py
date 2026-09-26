@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from pydantic import BaseModel
-from datetime import date, datetime
+from datetime import date, datetime, time as hora_reloj
 from decimal import Decimal
 from pathlib import Path
 from fastapi.responses import FileResponse
@@ -10,6 +10,7 @@ from fastapi import HTTPException
 from app.models.adquirente import Adquirente
 from app.models.proveedor import Proveedor
 from app.logica import calcular_factoring
+from app.logica import grabar_cotizacion
 from app.cotizacion import generar_cotizacion_pdf
 from app.gemini_cliente import enviar_mensaje, consumir_pdf_generado
 
@@ -34,7 +35,7 @@ class ChatRequest(BaseModel):
 class CalculoFactoringRequest(BaseModel):
     tea: Decimal
     factor_adelanto: Decimal
-    importe: Decimal
+    VNPP: Decimal
     fecha_pago: date
 
 class CotizacionPDFRequest(BaseModel):
@@ -42,6 +43,20 @@ class CotizacionPDFRequest(BaseModel):
     razon_social_proveedor: str
     id_proveedor: int
     facturas: list[dict]
+
+class GrabarCotizacionRequest(BaseModel):
+    nombres: str
+    apellidos: str
+    telefono:str
+    forma_contacto: str
+    hora_inicio: hora_reloj
+    hora_fin: hora_reloj
+    ruc_proveedor: str
+    razon_social_proveedor: str
+    facturas: list[dict]
+    #facturas json {ruc_adquirente, razon_social_adquirente, TEM, FactorAdelanto, 
+    #               VNPP, fecha_pago, Plazo, ImporteAdelanto, Interes, ComisionFactoring, IGV,
+    #               ImporteDesembolsar, ImporteRemanente}
 
 @app.get("/cotizaciones/{nombre_archivo}")
 def descargar_cotizacion(nombre_archivo: str):
@@ -77,7 +92,7 @@ def api_calcular_factoring(datos: CalculoFactoringRequest) -> dict:
     return calcular_factoring(
         datos.tea,
         datos.factor_adelanto,
-        datos.importe,
+        datos.VNPP,
         datos.fecha_pago
     )
 
@@ -101,6 +116,22 @@ def api_generar_cotizacion_pdf(datos: CotizacionPDFRequest) -> FileResponse:
         media_type="application/pdf",
         filename="cotizacion_factoring.pdf"
     )
+
+@app.post("/cotizaciones/grabar")
+def api_grabar_cotizacion(datos: GrabarCotizacionRequest) -> bool:
+
+    return grabar_cotizacion(
+        nombres = datos.nombres,
+        apellidos = datos.apellidos,
+        telefono = datos.telefono,
+        forma_contacto = datos.forma_contacto,
+        hora_inicio = datos.hora_inicio,
+        hora_fin = datos.hora_fin,
+        ruc_proveedor = datos.ruc_proveedor,
+        razon_social_proveedor = datos.razon_social_proveedor,
+        facturas = datos.facturas
+    )
+
 
 @app.post("/chat")
 def chat(request: ChatRequest) -> dict:

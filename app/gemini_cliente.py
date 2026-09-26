@@ -1,6 +1,6 @@
 import os
 import time
-from datetime import date, datetime
+from datetime import date, datetime, time as hora_reloj
 from decimal import Decimal
 from typing import Any, Literal
 from pydantic import BaseModel, Field
@@ -15,6 +15,7 @@ from app.prompt import SYSTEM_INSTRUCTION
 from app.models.adquirente import Adquirente
 from app.models.proveedor import Proveedor
 from app.logica import calcular_factoring as calcular_factoring_backend
+from app.logica import grabar_cotizacion as grabar_cotizacion_backend
 from app.cotizacion import generar_cotizacion_pdf as generar_cotizacion_pdf_backend
 
 
@@ -62,6 +63,36 @@ def convertir_json(valor: Any) -> Any:
     return valor
 
 
+#Función para convertir valores decimales en un JSON
+def convertir_decimal(origen: list[dict]) -> list[dict]:
+    # Convertir los valores recibidos desde Gemini
+    # nuevamente a los tipos usados por el Backend.
+    campos_decimal = [
+        "TEM",
+        "FactorAdelanto",
+        "Importe",
+        "VNPP",
+        "ImporteAdelanto",
+        "Interes",
+        "ComisionFactoring",
+        "IGV",
+        "ImporteDesembolsar",
+        "ImporteRemanente"
+    ]
+    destino = []
+    for registro in origen:
+        r = registro.copy()
+        for campo in campos_decimal:
+            if campo in r:
+                r[campo] = Decimal(str(r[campo]))
+        if isinstance(r.get("fecha_pago"), str):
+            r["fecha_pago"] = date.fromisoformat(r["fecha_pago"])
+        destino.append(r)
+    return destino
+
+
+
+
 # Definimos las cuatro herramientas del backend
 
 def consultar_adquirente(RUC: str) -> dict[str, Any]:
@@ -92,24 +123,24 @@ def consultar_proveedor(RUC: str) -> dict[str, Any]:
 
     return convertir_json(resultado)
 
-def calcular_factoring(tea: str, factor_adelanto: str, importe: str, fecha_pago: str) -> dict[str, Any]:
+def calcular_factoring(tea: str, factor_adelanto: str, VNPP: str, fecha_pago: str) -> dict[str, Any]:
     #Calcula una operación de factoring.
     #Input:     tea: TEA obtenida del adquirente.
     #           factor_adelanto: Factor de Adelanto obtenido del adquirente.
-    #           importe: VNPP de la factura.
+    #           VNPP: Monto a financiar de la factura.
     #           fecha_pago: Fecha de pago en formato YYYY-MM-DD.
     #Output: Diccionario con el cálculo del factoring
     inicio = time.perf_counter()
     print(
         f">>> TOOL calcular_factoring: "
         f"TEA={tea}, Factor={factor_adelanto}, "
-        f"Importe={importe}, Fecha={fecha_pago}"
+        f"VNPP={VNPP}, Fecha={fecha_pago}"
     )
 
     resultado = calcular_factoring_backend(
         tea=Decimal(str(tea)),
         factor_adelanto=Decimal(str(factor_adelanto)),
-        importe=Decimal(str(importe)),
+        VNPP=Decimal(str(VNPP)),
         fecha_pago=date.fromisoformat(fecha_pago)
     )
 
@@ -139,30 +170,8 @@ def generar_cotizacion_pdf(ruc_proveedor: str, id_proveedor: int, facturas: list
     nombre_archivo = (f"cotizacion_{ruc_proveedor}_{timestamp}.pdf")
     ruta_salida = (CARPETA_COTIZACIONES / nombre_archivo)
 
-    # Convertir los valores recibidos desde Gemini
-    # nuevamente a los tipos usados por el Backend.
-    campos_decimal = [
-        "TEM",
-        "FactorAdelanto",
-        "importe",
-        "ImporteAdelanto",
-        "Interes",
-        "ComisionFactoring",
-        "IGV",
-        "ImporteDesembolsar",
-        "ImporteRemanente"
-    ]
+    facturas_backend = convertir_decimal(facturas)
 
-    facturas_backend = []
-
-    for factura in facturas:
-        f = factura.copy()
-        for campo in campos_decimal:
-            if campo in f:
-                f[campo] = Decimal(str(f[campo]))
-        if isinstance(f.get("fecha_pago"), str):
-            f["fecha_pago"] = date.fromisoformat(f["fecha_pago"])
-        facturas_backend.append(f)
     generar_cotizacion_pdf_backend(
         ruc_proveedor=ruc_proveedor,
         razon_social_proveedor=razon_social_proveedor,
@@ -180,6 +189,28 @@ def generar_cotizacion_pdf(ruc_proveedor: str, id_proveedor: int, facturas: list
     print(f">>> Tiempo TOOL generar_cotizacion_pdf: {fin - inicio:.2f} s")
 
     return {"nombre_archivo": nombre_archivo}
+
+
+def grabar_cotizacion(nombres: str, apellidos: str, telefono: str, forma_contacto: str,
+                       hora_inicio: str, hora_fin: str, ruc_proveedor: str, razon_social_proveedor: str,
+                       facturas: list[dict]) -> bool:
+    inicio = time.perf_counter()
+
+    print(f">>> TOOL grabar_cotizacion: {nombres} {apellidos} {telefono} {forma_contacto} {hora_inicio} {hora_fin} {ruc_proveedor} {razon_social_proveedor}")
+    print(f"facturas={facturas}")
+
+    hora_inicio_backend = hora_reloj.fromisoformat(hora_inicio[:8])
+    hora_fin_backend = hora_reloj.fromisoformat(hora_fin[:8])
+
+    facturas_backend = convertir_decimal(facturas)
+    respuesta = grabar_cotizacion_backend (nombres, apellidos, telefono, forma_contacto,
+                                           hora_inicio_backend, hora_fin_backend, ruc_proveedor, razon_social_proveedor,
+                                           facturas_backend)
+
+    fin = time.perf_counter()
+    print(f">>> Tiempo TOOL grabar_cotizacion: {fin - inicio:.2f} s")
+
+    return respuesta
 
 
 # Funciones para sala de chat multiusuarios
@@ -201,7 +232,8 @@ def crear_chat():
                 consultar_adquirente,
                 consultar_proveedor,
                 calcular_factoring,
-                generar_cotizacion_pdf
+                generar_cotizacion_pdf,
+                grabar_cotizacion
             ],
             tool_config=types.ToolConfig(
                 include_server_side_tool_invocations=True,
@@ -233,8 +265,31 @@ def enviar_mensaje(session_id: str, mensaje: str) -> dict:
 
         inicio_gemini = time.perf_counter()
         response = chat.send_message(mensaje)
-        fin_gemini = time.perf_counter()
 
+
+        #----------Codigo para verificar respuestas, invocacioes, tokens, temporal
+        print(f">>> Sesión: {session_id}")
+        for part in response.candidates[0].content.parts:
+            # Herramientas Python
+            if part.function_call:
+                print(f">>> FUNCTION CALL: {part.function_call.name}")
+            # RAG / File Search
+            if part.tool_call:
+                print(f">>> TOOL CALL: {part.tool_call.tool_type}")
+            if part.tool_response:
+                print(f">>> TOOL RESPONSE: {part.tool_response.tool_type}")
+        if response.usage_metadata:
+            print(">>> TOKENS:")
+            print(f"Entrada: {response.usage_metadata.prompt_token_count}")
+            print(f"Salida: {response.usage_metadata.candidates_token_count}")
+            print(f"Cache: {response.usage_metadata.cached_content_token_count}")
+            print(f"Tools: {response.usage_metadata.tool_use_prompt_token_count}")
+            print(f"Thinking: {response.usage_metadata.thoughts_token_count}")
+            print(f"Total: {response.usage_metadata.total_token_count}")
+        #----------Fin temporal
+
+
+        fin_gemini = time.perf_counter()
 
         #Limpiando la respuesta para evitar que salga warnings en la terminal
         inicio_procesamiento = time.perf_counter()

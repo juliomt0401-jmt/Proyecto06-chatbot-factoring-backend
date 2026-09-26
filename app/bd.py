@@ -103,3 +103,50 @@ class BD:
                 cursor.close()
             if conn and conn.is_connected():
                 conn.close()
+
+    def grabar_cabecera_detalle(
+        self,
+        sql_cabecera: str,
+        params_cabecera: tuple,
+        sql_detalle: str,
+        params_detalles: list[tuple]
+    ) -> bool:
+
+        conn = None
+        cursor = None
+        try:
+
+            conn = self._conectar()
+            if conn is None:
+                return False
+            cursor = conn.cursor()
+
+            # Grabar cabecera
+            cursor.execute(sql_cabecera, params_cabecera)
+            id_cabecera = cursor.lastrowid
+            if id_cabecera is None:
+                conn.rollback()
+                return False
+
+            # Agregar id de cabecera a cada detalle
+            detalles = []
+            for params in params_detalles:
+                detalle = (id_cabecera,) + params
+                detalles.append(detalle)
+
+            # Grabar todos los detalles
+            cursor.executemany(sql_detalle, detalles)
+            conn.commit()
+            return True
+
+        except Exception as e:
+            print(f"Error al grabar cabecera/detalle: {e}")
+            if conn:
+                conn.rollback()
+            return False
+
+        finally:
+            if cursor:
+                cursor.close()
+            if conn and conn.is_connected():
+                conn.close()

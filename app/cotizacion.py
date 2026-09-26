@@ -50,7 +50,7 @@ def generar_cotizacion_pdf(
     #        "id_adquirente": int,
     #        "TEM": Decimal,
     #        "FactorAdelanto": Decimal,
-    #        "importe": Decimal,
+    #        "VNPP": Decimal,
     #        "fecha_pago": date,
     #        "Plazo": int,
     #        "ImporteAdelanto": Decimal,
@@ -244,8 +244,8 @@ def generar_cotizacion_pdf(
     # No hay recálculo financiero.
     # ---------------------------------------------------------
 
-    importe_total = sum(
-        Decimal(f["Importe"])
+    VNPP_total = sum(
+        Decimal(f["VNPP"])
         for f in facturas
     )
 
@@ -486,7 +486,7 @@ def generar_cotizacion_pdf(
                     estilo_label
                 ),
                 Paragraph(
-                    "Importe total",
+                    "VNPP total",
                     estilo_label
                 ),
                 Paragraph(
@@ -504,7 +504,7 @@ def generar_cotizacion_pdf(
                     estilo_valor
                 ),
                 Paragraph(
-                    formato_moneda(importe_total),
+                    formato_moneda(VNPP_total),
                     estilo_valor
                 ),
                 Paragraph(
@@ -602,7 +602,7 @@ def generar_cotizacion_pdf(
     cabecera_detalle = [
         "#",
         "Adquirente",
-        "Importe",
+        "VNPP",
         "Fecha pago",
         "Plazo",
         "TEM",
@@ -646,7 +646,7 @@ def generar_cotizacion_pdf(
             ),
             Paragraph(
                 formato_moneda(
-                    factura["Importe"]
+                    factura["VNPP"]
                 ),
                 estilo_detalle
             ),
@@ -722,7 +722,7 @@ def generar_cotizacion_pdf(
     proporciones = [
         0.025,   # #
         0.205,   # adquirente
-        0.080,   # importe
+        0.080,   # VNPP
         0.070,   # fecha
         0.040,   # plazo
         0.050,   # TEM

@@ -1,7 +1,7 @@
 import requests
 import os
 from decimal import Decimal, ROUND_HALF_UP
-from datetime import date, timedelta
+from datetime import date, timedelta, time as hora_reloj
 from app.bd import BD
 
 RUC_FACTOR = os.getenv("RUC_FACTOR")
@@ -45,7 +45,7 @@ def obtener_ingreso_minimo() -> Decimal:
     return ingreso_minimo
 
 
-def calcular_factoring(tea: Decimal, factor_adelanto: Decimal, importe: Decimal, fecha_pago: date) -> dict:
+def calcular_factoring(tea: Decimal, factor_adelanto: Decimal, VNPP: Decimal, fecha_pago: date) -> dict:
 
     # Plazo de financiamiento
     fecha_inicio = date.today() + timedelta(days=1)
@@ -56,7 +56,7 @@ def calcular_factoring(tea: Decimal, factor_adelanto: Decimal, importe: Decimal,
     ted = calcular_TED_desde_TEA(tea)
 
     # Adelanto
-    importe_adelanto = round( round(importe * factor_adelanto, 3), 2)
+    importe_adelanto = round( round(VNPP * factor_adelanto, 3), 2)
 
     # Interés anticipado
     uno = Decimal("1")
@@ -75,13 +75,13 @@ def calcular_factoring(tea: Decimal, factor_adelanto: Decimal, importe: Decimal,
     importe_desembolsar = (importe_adelanto - interes - comision_factoring - igv)
 
     # Importe remanente
-    importe_remanente = (importe - importe_adelanto)
+    importe_remanente = (VNPP - importe_adelanto)
 
     return {
         "TEA": tea,
         "TEM": tem,
         "TED": ted,
-        "Importe": importe,
+        "VNPP": VNPP,
         "FactorAdelanto": factor_adelanto,
         "ImporteAdelanto": importe_adelanto,
         "Plazo": plazo,
@@ -92,6 +92,59 @@ def calcular_factoring(tea: Decimal, factor_adelanto: Decimal, importe: Decimal,
         "ImporteRemanente": importe_remanente
     }
 
+
+def grabar_cotizacion(nombres: str, apellidos: str, telefono: str, forma_contacto: str,
+                      hora_inicio: hora_reloj, hora_fin: hora_reloj, ruc_proveedor: str,
+                      razon_social_proveedor: str, facturas: list[dict]) -> bool:
+
+    sql_cabecera = """
+        INSERT INTO Cotizacion (Fecha, RUC_Proveedor, Razon_Social_Proveedor, Apellidos, Nombres,
+                                Telefono, Tipo_Contacto, Hora_Inicio_Contacto,Hora_Fin_Contacto)
+        VALUES (NOW(), %s, %s, %s, %s, %s, %s, %s, %s)
+    """
+    params_cabecera = (ruc_proveedor, razon_social_proveedor, apellidos, nombres,
+                       telefono, forma_contacto, hora_inicio, hora_fin)
+
+    sql_detalle = """
+        INSERT INTO CotizacionDetalle (idCotizacion, Item, RUC_Adquirente, Razon_Social_Adquirente,
+                                       TEM, Factor_Adelanto, VNPP, Fecha_Pago, Plazo,
+                                       Importe_Financiado, Interes_Compensatorio, Comision_Factoring,
+                                       IGV, Importe_a_Desembolsar, Importe_Remanente)
+        VALUES (%s, %s, %s, %s, 
+                %s, %s, %s, %s, %s, 
+                %s, %s, %s, 
+                %s, %s, %s)
+    """
+
+    params_detalles = []
+    item = 1
+    for factura in facturas:
+        detalle = (
+            item,
+            factura["ruc_adquirente"],
+            factura["razon_social_adquirente"],
+            factura["TEM"],
+            factura["FactorAdelanto"],
+            factura["VNPP"],
+            factura["fecha_pago"],
+            factura["Plazo"],
+            factura["ImporteAdelanto"],
+            factura["Interes"],
+            factura["ComisionFactoring"],
+            factura["IGV"],
+            factura["ImporteDesembolsar"],
+            factura["ImporteRemanente"]
+        )
+        params_detalles.append(detalle)
+        item += 1
+
+    db = BD()
+    return db.grabar_cabecera_detalle(
+        sql_cabecera,
+        params_cabecera,
+        sql_detalle,
+        params_detalles
+    )
 
 def consultar_ruc_api(RUC: str) -> str:
     try:
