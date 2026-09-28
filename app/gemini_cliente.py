@@ -274,34 +274,31 @@ def enviar_mensaje(session_id: str, mensaje: str) -> dict:
 
         inicio_gemini = time.perf_counter()
         response = chat.send_message(mensaje)
+        fin_gemini = time.perf_counter()
 
-        #----------Codigo para verificar respuestas, invocacioes, tokens, temporal
-        print(">>> Función enviar_mensaje")
-        print(f">>> Sesión: {session_id}")
+        inicio_log = time.perf_counter()
+        #----------Codigo para verificar respuestas, invocacioes, tokens
+        print(">>> FUNCION GEMINI: ENVIAR MENSAJE")
+        print(f">>> SESSIÓN: {session_id}")
         for part in response.candidates[0].content.parts:
             # Herramientas Python
             if part.function_call:
-                print(f">>> FUNCTION CALL: {part.function_call.name}")
+                print(f">>>>> FUNCTION CALL: {part.function_call.name}")
             # RAG / File Search
             if part.tool_call:
-                print(f">>> TOOL CALL: {part.tool_call.tool_type}")
+                print(f">>>>> TOOL CALL: {part.tool_call.tool_type}")
             if part.tool_response:
-                print(f">>> TOOL RESPONSE: {part.tool_response.tool_type}")
+                print(f">>>>> TOOL RESPONSE: {part.tool_response.tool_type}")
         if response.usage_metadata:
-            print(">>> TOKENS:")
-            print(f"Entrada: {response.usage_metadata.prompt_token_count}")
-            print(f"Salida: {response.usage_metadata.candidates_token_count}")
-            print(f"Cache: {response.usage_metadata.cached_content_token_count}")
-            print(f"Tools: {response.usage_metadata.tool_use_prompt_token_count}")
-            print(f"Thinking: {response.usage_metadata.thoughts_token_count}")
-            print(f"Total: {response.usage_metadata.total_token_count}")
-        #----------Fin temporal
+            print(">>>>> TOKENS:")
+            print(f">>>>>>> Entrada: {response.usage_metadata.prompt_token_count}")
+            print(f">>>>>>> Salida: {response.usage_metadata.candidates_token_count}")
+            print(f">>>>>>> Cache: {response.usage_metadata.cached_content_token_count}")
+            print(f">>>>>>> Tools: {response.usage_metadata.tool_use_prompt_token_count}")
+            print(f">>>>>>> Thinking: {response.usage_metadata.thoughts_token_count}")
+            print(f">>>>>>> Total: {response.usage_metadata.total_token_count}")
 
-
-        fin_gemini = time.perf_counter()
-
-        #Limpiando la respuesta para evitar que salga warnings en la terminal
-        inicio_procesamiento = time.perf_counter()
+        #----------Limpiando la respuesta para evitar que salga warnings en la terminal
         textos: list[str] = []
         if response.candidates:
             content = response.candidates[0].content
@@ -309,16 +306,20 @@ def enviar_mensaje(session_id: str, mensaje: str) -> dict:
                 for part in content.parts:
                     if part.text:
                         textos.append(part.text)
+        #----------Fin de verificar respuestas, invocacioes, tokens, temporal y de evitar warnings
+        fin_log = time.perf_counter()
 
+        inicio_procesamiento = time.perf_counter()
         resultado = RespuestaAgente.model_validate_json("".join(textos))
         fin_procesamiento = time.perf_counter()
         fin_total = time.perf_counter()
 
-        print(f">>> Sesión: {session_id}")
-        print(f">>> Tiempo obtener_chat: {fin_chat - inicio_chat:.2f} s")
-        print(f">>> Tiempo send_message: {fin_gemini - inicio_gemini:.2f} s")
-        print(f">>> Tiempo procesamiento respuesta: {fin_procesamiento - inicio_procesamiento:.2f} s")
-        print(f">>> Tiempo TOTAL enviar_mensaje: {fin_total - inicio_total:.2f} s")
+        print(f">>>>> TIEMPOS:")
+        print(f">>>>>>> Tiempo obtener_chat: {fin_chat - inicio_chat:.2f} s")
+        print(f">>>>>>> Tiempo send_message: {fin_gemini - inicio_gemini:.2f} s")
+        print(f">>>>>>> Tiempo mensajes log: {fin_log - inicio_log:.2f} s")
+        print(f">>>>>>> Tiempo procesamiento respuesta: {fin_procesamiento - inicio_procesamiento:.2f} s")
+        print(f">>>>>>> Tiempo TOTAL enviar_mensaje: {fin_total - inicio_total:.2f} s")
 
         return {
             "response": resultado.respuesta,
