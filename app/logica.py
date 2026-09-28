@@ -95,15 +95,15 @@ def calcular_factoring(tea: Decimal, factor_adelanto: Decimal, VNPP: Decimal, fe
 
 def grabar_cotizacion(nombres: str, apellidos: str, telefono: str, forma_contacto: str,
                       hora_inicio: hora_reloj, hora_fin: hora_reloj, ruc_proveedor: str,
-                      razon_social_proveedor: str, facturas: list[dict]) -> bool:
+                      razon_social_proveedor: str, indicador_de_cotizacion: str, facturas: list[dict]) -> bool:
 
     sql_cabecera = """
         INSERT INTO Cotizacion (Fecha, RUC_Proveedor, Razon_Social_Proveedor, Apellidos, Nombres,
-                                Telefono, Tipo_Contacto, Hora_Inicio_Contacto,Hora_Fin_Contacto)
-        VALUES (NOW(), %s, %s, %s, %s, %s, %s, %s, %s)
+                                Telefono, Tipo_Contacto, Hora_Inicio_Contacto,Hora_Fin_Contacto, Cotizo)
+        VALUES (NOW(), %s, %s, %s, %s, %s, %s, %s, %s, %s)
     """
     params_cabecera = (ruc_proveedor, razon_social_proveedor, apellidos, nombres,
-                       telefono, forma_contacto, hora_inicio, hora_fin)
+                       telefono, forma_contacto, hora_inicio, hora_fin, indicador_de_cotizacion)
 
     sql_detalle = """
         INSERT INTO CotizacionDetalle (idCotizacion, Item, RUC_Adquirente, Razon_Social_Adquirente,

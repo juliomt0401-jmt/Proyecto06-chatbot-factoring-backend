@@ -32,8 +32,10 @@ class RespuestaAgente(BaseModel):
         description=("Etapa actual de la conversación, determinada según las reglas del SYSTEM_INSTRUCTION.")
     )
 
+#---------------------#
+# Inicializar cliente #
+#---------------------#
 
-# Inicializar cliente
 load_dotenv()
 api_key = os.getenv("GEMINI_API_KEY")   # Local (.env)
 file_search_store = os.environ["GEMINI_FILE_SEARCH_STORE"]
@@ -42,6 +44,11 @@ client = genai.Client(api_key=api_key)
 chats: dict[str, Any] = {}
 pdf_generado: dict[str, dict[str, str]] = {}
 sesion_actual: ContextVar[str] = ContextVar("sesion_actual", default="")
+
+
+#----------------------#
+# Funciones de soporte #
+#----------------------#
 
 #Función para convertir valores a JSON serializable
 def convertir_json(valor: Any) -> Any:
@@ -64,7 +71,7 @@ def convertir_json(valor: Any) -> Any:
 
 
 #Función para convertir valores decimales en un JSON
-def convertir_decimal(origen: list[dict]) -> list[dict]:
+def convertir_decimal_json(origen: list[dict]) -> list[dict]:
     # Convertir los valores recibidos desde Gemini
     # nuevamente a los tipos usados por el Backend.
     campos_decimal = [
@@ -91,9 +98,9 @@ def convertir_decimal(origen: list[dict]) -> list[dict]:
     return destino
 
 
-
-
-# Definimos las cuatro herramientas del backend
+#-----------------------------------------#
+# Definimos las  herramientas del backend #
+#-----------------------------------------#
 
 def consultar_adquirente(RUC: str) -> dict[str, Any]:
     #Consulta un adquirente utilizando su RUC.
@@ -170,7 +177,7 @@ def generar_cotizacion_pdf(ruc_proveedor: str, id_proveedor: int, facturas: list
     nombre_archivo = (f"cotizacion_{ruc_proveedor}_{timestamp}.pdf")
     ruta_salida = (CARPETA_COTIZACIONES / nombre_archivo)
 
-    facturas_backend = convertir_decimal(facturas)
+    facturas_backend = convertir_decimal_json(facturas)
 
     generar_cotizacion_pdf_backend(
         ruc_proveedor=ruc_proveedor,
@@ -193,7 +200,7 @@ def generar_cotizacion_pdf(ruc_proveedor: str, id_proveedor: int, facturas: list
 
 def grabar_cotizacion(nombres: str, apellidos: str, telefono: str, forma_contacto: str,
                        hora_inicio: str, hora_fin: str, ruc_proveedor: str, razon_social_proveedor: str,
-                       facturas: list[dict]) -> bool:
+                       indicador_de_cotizacion: str, facturas: list[dict]) -> bool:
     inicio = time.perf_counter()
 
     print(f">>> TOOL grabar_cotizacion: {nombres} {apellidos} {telefono} {forma_contacto} {hora_inicio} {hora_fin} {ruc_proveedor} {razon_social_proveedor}")
@@ -202,18 +209,19 @@ def grabar_cotizacion(nombres: str, apellidos: str, telefono: str, forma_contact
     hora_inicio_backend = hora_reloj.fromisoformat(hora_inicio[:8])
     hora_fin_backend = hora_reloj.fromisoformat(hora_fin[:8])
 
-    facturas_backend = convertir_decimal(facturas)
+    facturas_backend = convertir_decimal_json(facturas)
     respuesta = grabar_cotizacion_backend (nombres, apellidos, telefono, forma_contacto,
                                            hora_inicio_backend, hora_fin_backend, ruc_proveedor, razon_social_proveedor,
-                                           facturas_backend)
+                                           indicador_de_cotizacion, facturas_backend)
 
     fin = time.perf_counter()
     print(f">>> Tiempo TOOL grabar_cotizacion: {fin - inicio:.2f} s")
 
     return respuesta
 
-
-# Funciones para sala de chat multiusuarios
+#-------------------------------------------#
+# Funciones para sala de chat multiusuarios #
+#-------------------------------------------#
 
 def crear_chat():
     return client.chats.create(
@@ -244,11 +252,12 @@ def crear_chat():
         )
     )
 
+
 def obtener_chat(session_id: str):
     if session_id not in chats:
         chats[session_id] = crear_chat()
-
     return chats[session_id]
+
 
 def consumir_pdf_generado(session_id: str) -> dict[str, str] | None:
     return pdf_generado.pop(session_id, None)
@@ -266,8 +275,8 @@ def enviar_mensaje(session_id: str, mensaje: str) -> dict:
         inicio_gemini = time.perf_counter()
         response = chat.send_message(mensaje)
 
-
         #----------Codigo para verificar respuestas, invocacioes, tokens, temporal
+        print(">>> Función enviar_mensaje")
         print(f">>> Sesión: {session_id}")
         for part in response.candidates[0].content.parts:
             # Herramientas Python

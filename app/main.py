@@ -53,6 +53,7 @@ class GrabarCotizacionRequest(BaseModel):
     hora_fin: hora_reloj
     ruc_proveedor: str
     razon_social_proveedor: str
+    indicador_de_cotizacion: str
     facturas: list[dict]
     #facturas json {ruc_adquirente, razon_social_adquirente, TEM, FactorAdelanto, 
     #               VNPP, fecha_pago, Plazo, ImporteAdelanto, Interes, ComisionFactoring, IGV,
@@ -129,6 +130,7 @@ def api_grabar_cotizacion(datos: GrabarCotizacionRequest) -> bool:
         hora_fin = datos.hora_fin,
         ruc_proveedor = datos.ruc_proveedor,
         razon_social_proveedor = datos.razon_social_proveedor,
+        indicador_de_cotizacion = datos.indicador_de_cotizacion,
         facturas = datos.facturas
     )
 
