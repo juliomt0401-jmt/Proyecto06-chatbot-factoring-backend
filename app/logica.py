@@ -146,31 +146,46 @@ def grabar_cotizacion(nombres: str, apellidos: str, telefono: str, forma_contact
         params_detalles
     )
 
-def consultar_ruc_api(RUC: str) -> str:
+def consultar_ruc_api(RUC: str) -> dict[str, str]:
     try:
-        url = f"https://openruc.com/api/ruc/{RUC}"
-        response = requests.get(url, timeout=5)
-        if response.status_code == 404:             #404 Not Found
-            return ""
+        DECOLECTA_API_KEY = os.getenv("DECOLECTA_API_KEY")   # Local (.env)
+        URL_DECOLECTA_RUC = os.getenv("URL_DECOLECTA_RUC")   # Local (.env)
+        if URL_DECOLECTA_RUC is None: raise ValueError("URL_DECOLECTA_RUC no está configurada")
+        response = requests.get(
+            URL_DECOLECTA_RUC,
+            headers={
+                "Authorization": f"Bearer {DECOLECTA_API_KEY}",
+                "Accept": "application/json"
+            },
+            params={"numero": RUC},
+            timeout=15
+        )
+        if response.status_code in (400, 404, 422):
+            return {}
         response.raise_for_status()
         datos = response.json()
-        return datos.get("razon_social", "")
+        if datos.get("message") == "ruc no valido": return {}
+        return {
+            "razon_social": datos.get("razon_social", ""),
+            "estado": datos.get("estado", ""),
+            "condicion": datos.get("condicion", "")
+        }
 
     except requests.Timeout:
-        print("Error: tiempo de espera agotado al consultar OpenRUC.")
-        return ""
+        print("Error: tiempo de espera agotado al consultar API DECOLECTA.")
+        return {}
     except requests.ConnectionError:
-        print("Error: no se pudo conectar con OpenRUC.")
-        return ""
+        print("Error: no se pudo conectar con API DECOLECTA.")
+        return {}
     except requests.HTTPError as e:
-        print(f"Error HTTP al consultar OpenRUC: {e}")
-        return ""
+        print(f"Error HTTP al consultar API DECOLECTA: {e}")
+        return {}
     except requests.RequestException as e:
-        print(f"Error en la consulta a OpenRUC: {e}")
-        return ""
-    except ValueError:
-        print("Error: OpenRUC devolvió una respuesta que no es JSON válido.")
-        return ""
+        print(f"Error en la consulta a API DECOLECTA: {e}")
+        return {}
+    except ValueError as e:
+        print(f"Error al consultar API DECOLECTA: {e}")
+        return {}
 
 
 def buscar_descripcion_tabla(tabla: str, elemento: str) -> str:

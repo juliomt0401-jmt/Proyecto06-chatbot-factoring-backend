@@ -91,29 +91,48 @@ class Adquirente:
         #Verifica si un adquirente existe por su RUC.
         #Retorna un diccionario con idAdquirente, RazonSocial, NombreComercial, LineaAsignada, TEA, TEM, Estado.
         #Si no existe, idAdquirente retorna 0 y buscará RazonSocial en el API con el RUC.
+        
+        datos_ruc = consultar_ruc_api(RUC)
+        if not datos_ruc:
+            return {
+            "idAdquirente": 0,
+            "RazonSocial": "",
+            "NombreComercial": "",
+            "LineaAsignada": Decimal("0.00"),
+            "TEA": Decimal("0.00"),
+            "TEM": Decimal("0.00"),
+            "FactorAdelanto": Decimal("0.00"),
+            "Estado": "",
+            "Estado_SUNAT": "",
+            "Condicion_SUNAT": ""
+        }
+        
         db = BD()
         sql = """
-            SELECT idAdquirente, RazonSocial, NombreComercial, LineaAsignada, TEA, TEM, FactorAdelanto, Estado
+            SELECT idAdquirente, RazonSocial, NombreComercial, LineaAsignada, TEA, TEM, FactorAdelanto, 
+                   Estado, %s as Estado_SUNAT, %s as Condicion_SUNAT
             FROM empresas e inner join adquirentes a on e.RUC = a.RUC 
             WHERE e.RUC = %s
         """
-        recordset = db.ejecutar_SQL(sql, (RUC,))
-        
+        recordset = db.ejecutar_SQL(sql, (datos_ruc.get("estado", ""),
+                                          datos_ruc.get("condicion", ""),
+                                          RUC,))
         if recordset:
             return recordset[0]
 
-        razon_social = consultar_ruc_api(RUC)
         FactorAdelanto = _calcular_FactorAdelanto_adquirente_por_ranking_top(RUC)
         TEA = _calcular_TEA_adquirente_por_ranking_top(RUC)
         TEM = calcular_TEM_desde_TEA(TEA)
  
         return {
             "idAdquirente": 0,
-            "RazonSocial": razon_social,
+            "RazonSocial": datos_ruc.get("razon_social", ""),
             "NombreComercial": "",
             "LineaAsignada": Decimal("0.00"),
             "TEA": TEA,
             "TEM": TEM,
             "FactorAdelanto": FactorAdelanto,
-            "Estado": ""
+            "Estado": "",
+            "Estado_SUNAT": datos_ruc.get("estado", ""),
+            "Condicion_SUNAT": datos_ruc.get("condicion", "")
         }

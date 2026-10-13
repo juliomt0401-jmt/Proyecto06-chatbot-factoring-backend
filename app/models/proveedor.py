@@ -25,30 +25,49 @@ class Proveedor:
 
     @staticmethod
     def consultar_proveedor(RUC):
+
+        datos_ruc = consultar_ruc_api(RUC)
+        if not datos_ruc:
+            return {
+            "idProveedor": 0,
+            "RUC": RUC,
+            "RazonSocial": "",
+            "NombreComercial": "",
+            "Telefono": "",
+            "TipoContribuyente": "",
+            "DesTipoContribuyente": "",
+            "Estado": "",
+            "Estado_SUNAT": "",
+            "Condicion_SUNAT": ""
+        }
+
         sql = """
             SELECT
                 p.idProveedor, p.RUC, e.RazonSocial, e.NombreComercial, e.Telefono, 
-                e.TipoContribuyente, t.Descripcion AS DesTipoContribuyente, p.Estado
+                e.TipoContribuyente, t.Descripcion AS DesTipoContribuyente, p.Estado,
+                %s as Estado_SUNAT, %s as Condicion_SUNAT
             FROM Proveedores p INNER JOIN Empresas e
             ON e.RUC = p.RUC INNER JOIN sys_tablas t 
             ON t.idTabla = 'TCOS' AND t.idElemento = e.TipoContribuyente
             WHERE p.RUC = %s
         """
         db = BD()
-        recordset = db.ejecutar_SQL(sql, (RUC,))
+        recordset = db.ejecutar_SQL(sql, (datos_ruc.get("estado", ""),
+                                          datos_ruc.get("condicion", ""),
+                                          RUC,))
         if recordset:
             return recordset[0]
-
-        razon_social = consultar_ruc_api(RUC)
 
         return {
             "idProveedor": 0,
             "RUC": RUC,
-            "RazonSocial": razon_social,
+            "RazonSocial": datos_ruc.get("razon_social", ""),
             "NombreComercial": "",
             "Telefono": "",
             "TipoContribuyente": "",
             "DesTipoContribuyente": "",
-            "Estado": ""
+            "Estado": "",
+            "Estado_SUNAT": datos_ruc.get("estado", ""),
+            "Condicion_SUNAT": datos_ruc.get("condicion", "")
         }
 
